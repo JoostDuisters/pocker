@@ -1,3 +1,4 @@
+from enum import Flag
 import os
 import ctypes
 
@@ -18,8 +19,8 @@ CLONE_NEWPID = 0x20000000
 CLONE_NEWTIME = 0x00000080
 
 
-def mount(source, target, fs):
-    rc = libc.mount(source.encode(), target.encode(), fs.encode(), 0)
+def mount(source, target, fst, flags = 0):
+    rc = libc.mount(source.encode(), target.encode(), fst.encode(), flags)
     if rc == -1:
         raise Exception(os.strerror(get_errno_loc()[0]))
 

@@ -3,7 +3,6 @@ import shutil
 import os
 import uuid
 import tarfile
-import subprocess
 import syscalls
 
 
@@ -60,20 +59,29 @@ def pocker_run(image, tag, cmd=["/bin/bash"]):
     # TODO: make it keep track of images that have already been pulled.
     pocker_pull(image, tag, image_hash, root_dir)
 
-    # unshare
-    syscalls.unshare(
-        syscalls.CLONE_NEWUTS |
-        syscalls.CLONE_NEWPID |
-        syscalls.CLONE_NEWNET |
-        syscalls.CLONE_NEWNS)  # uts, pid, mount, ipc
+    pid = os.fork()
+    # Below gets run twice, once inside and once outside container
+    if pid == 0:
+        # Inside container
+        print("Inside container")
+        try:
+            # Unshare
+            syscalls.unshare(syscalls.CLONE_NEWNS)
+        except RuntimeError as e:
+            print(f'Error in unshare: {e}')
+        
+        # TODO: find out what this does
+        # syscalls.mount(None, '/', None, syscalls.MS_PRIVATE | syscalls.MS_REC, None)
+        
+        # TODO: should be pivot_root
+        os.chroot(image_dir)
+        os.chdir('/')
+        # TODO: Also mount sysfs and tmpfs
+        syscalls.mount('proc', '/proc', 'proc')
 
-    # change root to image dir
-    os.chroot(image_dir)
-    os.chdir('/')
-    syscalls.mount('/proc', '/proc', 'proc')
-
-    # Execute command
-    subprocess.run(cmd)
+        os.execvp(cmd[0], cmd)
+    else:
+        print('Outside container')
 
 
 pocker_run("alpine", "latest")
